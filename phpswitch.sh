@@ -83,79 +83,79 @@ done
 
 # Check if php version support via valet
 if [[ (" ${valet_support_php_version_array[*]} " != *"$php_version"*) && ($valet_restart -eq 1) ]]; then
-    echo "Sorry, but $php_version is not support via valet"
-    exit
+    echo "Sorry, but $php_version is not support via valet" 2>&1
+    exit 1
 fi
 
 # Check that the requested version is supported
-if [[ " ${php_array[*]} " == *"$php_version"* ]]; then
-    # Check that the requested version is installed
-    if [[ " ${php_installed_array[*]} " == *"$php_version"* ]]; then
-
-        # Stop valet service
-        if [[ ($valet_installed -eq 1) && ($valet_restart -eq 1) ]]; then
-            echo "Stop Valet service"
-            valet stop
-        fi
-
-        # Switch Shell
-        echo "Switching to $php_version"
-        echo "Switching your shell"
-        for i in ${php_installed_array[@]}; do
-            if [[ -n $(brew ls --versions $i) ]]; then
-                brew unlink $i
-            fi
-        done
-        brew link --force "$php_version"
-
-        # Switch apache
-        if [[ $apache_change -eq 1 ]]; then
-            echo "You will need sudo power from now on"
-            echo "Switching your apache conf"
-
-            for j in ${php_installed_array[@]}; do
-                loop_php_module="$php5_module"
-                loop_apache_php_lib_path="$apache_php5_lib_path"
-                if [ $(echo "$j" | sed 's/^php@//' | sed 's/\.//') -ge 70 ]; then
-                    loop_php_module="$php7_module"
-                    loop_apache_php_lib_path="$apache_php7_lib_path"
-                fi
-                apache_module_string="LoadModule $loop_php_module $php_opt_path$j$loop_apache_php_lib_path"
-                comment_apache_module_string="#$apache_module_string"
-
-                # If apache module string within apache conf
-                if grep -q "$apache_module_string" "$apache_conf_path"; then
-                    # If apache module string not commented out already
-                    if ! grep -q "$comment_apache_module_string" "$apache_conf_path"; then
-                        sudo sed -i.bak "s/$apache_module_string/$comment_apache_module_string/g" $apache_conf_path
-                    fi
-                # Else the string for the php module is not in the apache config then add it
-                else
-                    sudo sed -i.bak "/$native_osx_php_apache_module/a\\
-$comment_apache_module_string\\
-" $apache_conf_path
-                fi
-            done
-            sudo sed -i.bak "s/\#LoadModule $php_module $apache_php_mod_path/LoadModule $php_module $apache_php_mod_path/g" $apache_conf_path
-            echo "Restarting apache"
-            sudo apachectl restart
-        fi
-
-
-        # Switch valet
-        if [[ $valet_restart -eq 1 ]]; then
-            if [[ valet_installed -eq 1 ]]; then
-                valet restart
-             else
-               echo "valet doesn't installed in your system, will skip restarting valet service"
-            fi
-        fi
-
-        echo "All done!"
-    else
-        echo "Sorry, but $php_version is not installed via brew. Install by running: brew install $php_version"
-    fi
-else
-    echo "Unknown version of PHP. PHP Switcher can only handle arguments of:" ${brew_array[@]}
+if [[ " ${php_array[*]} " != *"$php_version"* ]]; then
+    echo "Unknown version of PHP. PHP Switcher can only handle arguments of:" ${brew_array[@]} 2>&1
+    exit 1
 fi
 
+# Check that the requested version is installed
+if [[ " ${php_installed_array[*]} " != *"$php_version"* ]]; then
+    echo "Sorry, but $php_version is not installed via brew. Install by running: brew install $php_version" 2>&1
+    exit 1
+fi
+
+# Stop valet service
+if [[ ($valet_installed -eq 1) && ($valet_restart -eq 1) ]]; then
+    echo "Stop Valet service"
+    valet stop
+fi
+
+# Switch Shell
+echo "Switching to $php_version"
+echo "Switching your shell"
+for i in ${php_installed_array[@]}; do
+    if [[ -n $(brew ls --versions $i) ]]; then
+        brew unlink $i
+    fi
+done
+brew link --force "$php_version"
+
+# Switch apache
+if [[ $apache_change -eq 1 ]]; then
+    echo "You will need sudo power from now on"
+    echo "Switching your apache conf"
+
+    for j in ${php_installed_array[@]}; do
+        loop_php_module="$php5_module"
+        loop_apache_php_lib_path="$apache_php5_lib_path"
+        if [ $(echo "$j" | sed 's/^php@//' | sed 's/\.//') -ge 70 ]; then
+            loop_php_module="$php7_module"
+            loop_apache_php_lib_path="$apache_php7_lib_path"
+        fi
+        apache_module_string="LoadModule $loop_php_module $php_opt_path$j$loop_apache_php_lib_path"
+        comment_apache_module_string="#$apache_module_string"
+
+        # If apache module string within apache conf
+        if grep -q "$apache_module_string" "$apache_conf_path"; then
+            # If apache module string not commented out already
+            if ! grep -q "$comment_apache_module_string" "$apache_conf_path"; then
+                sudo sed -i.bak "s/$apache_module_string/$comment_apache_module_string/g" $apache_conf_path
+            fi
+        # Else the string for the php module is not in the apache config then add it
+        else
+            sudo sed -i.bak "/$native_osx_php_apache_module/a\\
+$comment_apache_module_string\\
+" $apache_conf_path
+        fi
+    done
+    sudo sed -i.bak "s/\#LoadModule $php_module $apache_php_mod_path/LoadModule $php_module $apache_php_mod_path/g" $apache_conf_path
+    echo "Restarting apache"
+    sudo apachectl restart
+fi
+
+
+# Switch valet
+if [[ $valet_restart -eq 1 ]]; then
+    if [[ valet_installed -eq 1 ]]; then
+        valet restart
+     else
+       echo "valet doesn't installed in your system, will skip restarting valet service"
+    fi
+fi
+
+echo "All done!"
